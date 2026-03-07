@@ -40,13 +40,7 @@ export function Arena() {
   }
 
   function handleGradeSubmit(score: number) {
-    try {
-      markScenarioComplete(selectedScenario.id, score);
-    } catch {
-      setError(
-        "Your score was recorded for this session but could not be saved. Progress may be lost if you reload."
-      );
-    }
+    markScenarioComplete(selectedScenario.id, score);
     setCompletedIds((prev) => new Set([...prev, selectedScenario.id]));
 
     const nextIdx =

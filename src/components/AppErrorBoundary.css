@@ -1,0 +1,24 @@
+.error-boundary {
+  padding: var(--space-8);
+  font-family: var(--font-body);
+  max-width: 600px;
+  margin: var(--space-16) auto;
+}
+
+.error-boundary__heading {
+  font-family: var(--font-display);
+  margin-bottom: var(--space-4);
+}
+
+.error-boundary__message {
+  margin-bottom: var(--space-4);
+  color: var(--color-gray);
+}
+
+.error-boundary__detail {
+  font-size: 12px;
+  color: var(--color-red);
+  background: var(--color-gray-lighter);
+  padding: var(--space-4);
+  border: 1px solid var(--color-gray-border);
+}
