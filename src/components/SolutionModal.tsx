@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { Scenario } from "../types/scenario";
 import "./SolutionModal.css";
 
@@ -7,6 +8,14 @@ interface SolutionModalProps {
 }
 
 export function SolutionModal({ scenario, onClose }: SolutionModalProps) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   return (
     <div
       className="modal-overlay"

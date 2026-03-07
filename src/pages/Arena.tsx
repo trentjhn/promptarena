@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { scenarios } from "../data/scenarios";
 import { submitPromptToApi } from "../utils/api-client";
-import { markScenarioComplete, isScenarioCompleted } from "../utils/progress";
+import { loadProgress, markScenarioComplete } from "../utils/progress";
 import { ScenarioCard } from "../components/ScenarioCard";
 import { PromptEditor } from "../components/PromptEditor";
 import { ResponseDisplay } from "../components/ResponseDisplay";
@@ -18,9 +18,10 @@ export function Arena() {
   const [error, setError] = useState("");
   const [showSolution, setShowSolution] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [completedIds, setCompletedIds] = useState<Set<string>>(
-    () => new Set(scenarios.filter((s) => isScenarioCompleted(s.id)).map((s) => s.id))
-  );
+  const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
+    const { completedScenarios } = loadProgress();
+    return new Set(scenarios.filter((s) => s.id in completedScenarios).map((s) => s.id));
+  });
 
   async function handleSubmitPrompt() {
     setIsLoading(true);
@@ -39,7 +40,13 @@ export function Arena() {
   }
 
   function handleGradeSubmit(score: number) {
-    markScenarioComplete(selectedScenario.id, score);
+    try {
+      markScenarioComplete(selectedScenario.id, score);
+    } catch {
+      setError(
+        "Your score was recorded for this session but could not be saved. Progress may be lost if you reload."
+      );
+    }
     setCompletedIds((prev) => new Set([...prev, selectedScenario.id]));
 
     const nextIdx =
@@ -51,15 +58,22 @@ export function Arena() {
 
   function selectScenario(id: string) {
     const scenario = scenarios.find((s) => s.id === id);
-    if (!scenario) return;
+    if (!scenario) {
+      console.error(
+        `selectScenario: no scenario found with id "${id}". Available:`,
+        scenarios.map((s) => s.id)
+      );
+      return;
+    }
     setSelectedScenario(scenario);
     setUserPrompt("");
     setClaudeResponse("");
-    setTokensUsed(0);
     setHasSubmitted(false);
     setError("");
     setShowSolution(false);
   }
+
+  const handleCloseSolution = useCallback(() => setShowSolution(false), []);
 
   return (
     <div className="arena">
@@ -72,7 +86,6 @@ export function Arena() {
       </header>
 
       <div className="arena__layout">
-        {/* Left sidebar: scenario list */}
         <aside className="arena__sidebar">
           <p className="sidebar-label">Scenarios</p>
           {scenarios.map((scenario) => (
@@ -86,7 +99,6 @@ export function Arena() {
           ))}
         </aside>
 
-        {/* Right: practice area */}
         <main className="arena__content">
           <div className="scenario-info">
             <h2 className="scenario-title">{selectedScenario.title}</h2>
@@ -130,7 +142,7 @@ export function Arena() {
       {showSolution && (
         <SolutionModal
           scenario={selectedScenario}
-          onClose={() => setShowSolution(false)}
+          onClose={handleCloseSolution}
         />
       )}
     </div>

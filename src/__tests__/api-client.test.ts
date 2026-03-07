@@ -39,15 +39,31 @@ describe("API Client", () => {
       expect(result.tokensUsed).toBe(342);
     });
 
-    it("throws error on API failure (non-ok response)", async () => {
+    it("surfaces the server error message from the response body", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        json: vi.fn().mockResolvedValue({
+          error: "Rate limit exceeded. Please wait and try again.",
+        }),
+      });
+
+      await expect(submitPromptToApi("prompt", "task")).rejects.toThrow(
+        "Rate limit exceeded. Please wait and try again."
+      );
+    });
+
+    it("falls back to status code message when response body is not JSON", async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: "Internal Server Error",
+        json: vi.fn().mockRejectedValue(new SyntaxError("not json")),
       });
 
       await expect(submitPromptToApi("prompt", "task")).rejects.toThrow(
-        /API error/
+        "Request failed (500)"
       );
     });
 
@@ -59,6 +75,20 @@ describe("API Client", () => {
       await expect(submitPromptToApi("prompt", "task")).rejects.toThrow(
         /Network error/
       );
+    });
+
+    it("throws immediately when prompt is empty", async () => {
+      await expect(submitPromptToApi("", "task")).rejects.toThrow(
+        "Prompt cannot be empty"
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it("throws immediately when prompt is whitespace only", async () => {
+      await expect(submitPromptToApi("   ", "task")).rejects.toThrow(
+        "Prompt cannot be empty"
+      );
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 });

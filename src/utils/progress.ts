@@ -5,20 +5,40 @@ export interface Progress {
 }
 
 export function loadProgress(): Progress {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored
-    ? (JSON.parse(stored) as Progress)
-    : { completedScenarios: {} };
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return { completedScenarios: {} };
+    const parsed = JSON.parse(stored) as unknown;
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "completedScenarios" in parsed &&
+      typeof (parsed as Record<string, unknown>).completedScenarios === "object" &&
+      (parsed as Record<string, unknown>).completedScenarios !== null
+    ) {
+      return parsed as Progress;
+    }
+    console.error("progress: stored data had unexpected shape, resetting");
+    return { completedScenarios: {} };
+  } catch (err) {
+    console.error("progress: failed to load from localStorage:", err);
+    return { completedScenarios: {} };
+  }
 }
 
 export function saveProgress(progress: Progress): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  } catch (err) {
+    console.error("progress: failed to save to localStorage:", err);
+  }
 }
 
 export function markScenarioComplete(scenarioId: string, score: number): void {
   const progress = loadProgress();
-  progress.completedScenarios[scenarioId] = score;
-  saveProgress(progress);
+  saveProgress({
+    completedScenarios: { ...progress.completedScenarios, [scenarioId]: score },
+  });
 }
 
 export function isScenarioCompleted(scenarioId: string): boolean {
