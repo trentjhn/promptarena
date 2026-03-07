@@ -21,9 +21,8 @@ describe("Progress Tracking", () => {
       expect(progress.completedScenarios).toEqual({});
     });
 
-    it("returns saved progress from localStorage", () => {
-      const testProgress = { completedScenarios: { "test-id": 85 } };
-      localStorage.setItem("promptarena_progress", JSON.stringify(testProgress));
+    it("returns saved progress", () => {
+      saveProgress({ completedScenarios: { "test-id": 85 } });
 
       const loaded = loadProgress();
       expect(loaded.completedScenarios["test-id"]).toBe(85);
@@ -31,14 +30,12 @@ describe("Progress Tracking", () => {
   });
 
   describe("saveProgress", () => {
-    it("persists progress to localStorage", () => {
+    it("persists progress so loadProgress returns it", () => {
       const progress = { completedScenarios: { "scenario-1": 90 } };
       saveProgress(progress);
 
-      const stored = JSON.parse(
-        localStorage.getItem("promptarena_progress") ?? "{}"
-      );
-      expect(stored.completedScenarios["scenario-1"]).toBe(90);
+      const loaded = loadProgress();
+      expect(loaded.completedScenarios["scenario-1"]).toBe(90);
     });
   });
 

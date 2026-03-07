@@ -37,7 +37,7 @@ export function RubricDisplay({ scenario, onGrade }: RubricDisplayProps) {
                 Pass
               </button>
               <button
-                className={`btn-grade btn-grade--fail${scores[idx] === 0 ? " btn-grade--active" : ""}`}
+                className={`btn-grade btn-grade--fail${idx in scores && scores[idx] === 0 ? " btn-grade--active" : ""}`}
                 onClick={() => handleCriterionGrade(idx, 0)}
               >
                 Needs Work

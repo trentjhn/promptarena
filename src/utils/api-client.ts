@@ -2,15 +2,25 @@ export async function submitPromptToApi(
   userPrompt: string,
   scenarioTask: string
 ): Promise<{ response: string; tokensUsed: number }> {
-  const response = await fetch("/api/submit-prompt", {
+  if (!userPrompt.trim()) throw new Error("Prompt cannot be empty");
+  if (!scenarioTask.trim()) throw new Error("Scenario task is required");
+
+  const res = await fetch("/api/submit-prompt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userPrompt, scenarioTask }),
   });
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) message = body.error;
+    } catch {
+      /* response body not JSON — use status-based fallback */
+    }
+    throw new Error(message);
   }
 
-  return response.json() as Promise<{ response: string; tokensUsed: number }>;
+  return res.json() as Promise<{ response: string; tokensUsed: number }>;
 }

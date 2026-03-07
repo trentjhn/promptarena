@@ -48,20 +48,18 @@
 }
 
 .scenario-title {
-  animation: fadeInDown 0.4s ease-out;
+  animation: fadeInDown 0.4s ease-out both;
 }
 
 .scenario-description {
-  animation: fadeInDown 0.5s ease-out;
-  animation-delay: 0.1s;
+  animation: fadeInDown 0.5s ease-out 0.1s both;
   margin-top: var(--space-3);
   color: var(--color-gray);
   font-size: 13px;
 }
 
 .scenario-task {
-  animation: fadeInDown 0.6s ease-out;
-  animation-delay: 0.2s;
+  animation: fadeInDown 0.6s ease-out 0.2s both;
   margin-top: var(--space-4);
   border: 1px solid var(--color-black);
   padding: var(--space-4);

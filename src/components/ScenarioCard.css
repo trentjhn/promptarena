@@ -49,7 +49,7 @@
 }
 
 .difficulty--intermediate {
-  color: #92400e;
+  color: var(--color-amber);
 }
 
 .difficulty--advanced {
