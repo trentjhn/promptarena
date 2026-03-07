@@ -1,0 +1,32 @@
+.response-display {
+  padding: var(--space-6);
+  border: 1px solid var(--color-black);
+  background: var(--color-white);
+  margin-bottom: var(--space-8);
+}
+
+.response-display__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-4);
+}
+
+.response-display__tokens {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-blue);
+  animation: countUp 0.6s ease-out;
+}
+
+.response-display__content {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.8;
+  background: var(--color-gray-lighter);
+  border: 1px solid var(--color-gray-border);
+  padding: var(--space-4);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+}
