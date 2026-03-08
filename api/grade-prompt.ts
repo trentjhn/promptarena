@@ -74,6 +74,26 @@ Respond with ONLY a valid JSON object. No markdown, no code fences, no extra tex
 Set isEffective to true only if objectiveMet is true AND there are no significant gaps.
 If isEffective is true, gaps must be empty array and rewrittenPrompt must be empty string.`;
 
+function isValidFeedback(obj: unknown): obj is {
+  objectiveMet: boolean;
+  objectiveFeedback: string;
+  strengths: string[];
+  gaps: string[];
+  rewrittenPrompt: string;
+  isEffective: boolean;
+} {
+  if (!obj || typeof obj !== "object") return false;
+  const f = obj as Record<string, unknown>;
+  return (
+    typeof f.objectiveMet === "boolean" &&
+    typeof f.objectiveFeedback === "string" &&
+    Array.isArray(f.strengths) &&
+    Array.isArray(f.gaps) &&
+    typeof f.rewrittenPrompt === "string" &&
+    typeof f.isEffective === "boolean"
+  );
+}
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -135,6 +155,11 @@ ${claudeResponse}`;
       return;
     }
 
+    if (!isValidFeedback(feedback)) {
+      console.error("Grading response has unexpected shape:", feedback);
+      res.status(500).json({ error: "Received an unexpected grading format. Please try again." });
+      return;
+    }
     res.status(200).json(feedback);
   } catch (error) {
     const entry = API_ERRORS.find((e) => e.match(error));
