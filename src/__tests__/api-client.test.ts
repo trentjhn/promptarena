@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { submitPromptToApi } from "../utils/api-client";
+import { submitPromptToApi, gradePromptApi } from "../utils/api-client";
+import type { GradeFeedback } from "../types/scenario";
 
 describe("API Client", () => {
   beforeEach(() => {
@@ -89,6 +90,62 @@ describe("API Client", () => {
         "Prompt cannot be empty"
       );
       expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("gradePromptApi", () => {
+    const mockFeedback: GradeFeedback = {
+      objectiveMet: true,
+      objectiveFeedback: "Response achieved the scenario goal.",
+      strengths: ["Clear persona assigned", "Output format specified"],
+      gaps: ["No examples provided"],
+      rewrittenPrompt: "You are a senior analyst...",
+      isEffective: false,
+    };
+
+    it("calls grade endpoint and returns feedback", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockFeedback),
+      });
+
+      const result = await gradePromptApi("my prompt", "scenario task", "claude response");
+
+      expect(global.fetch).toHaveBeenCalledWith("/api/grade-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userPrompt: "my prompt",
+          scenarioTask: "scenario task",
+          claudeResponse: "claude response",
+        }),
+      });
+      expect(result.objectiveMet).toBe(true);
+      expect(result.strengths).toHaveLength(2);
+    });
+
+    it("surfaces server error message from response body", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: vi.fn().mockResolvedValue({ error: "Rate limit exceeded." }),
+      });
+
+      await expect(gradePromptApi("prompt", "task", "response")).rejects.toThrow(
+        "Rate limit exceeded."
+      );
+    });
+
+    it("falls back to status message when body is not JSON", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: vi.fn().mockRejectedValue(new SyntaxError("not json")),
+      });
+
+      await expect(gradePromptApi("prompt", "task", "response")).rejects.toThrow(
+        "Request failed (500)"
+      );
     });
   });
 });

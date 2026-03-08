@@ -6,19 +6,22 @@
   --color-white: #ffffff;
   --color-blue: #2563eb;
   --color-blue-dark: #1d4ed8;
-  --color-green: #16a34a;
   --color-red: #dc2626;
   --color-gray-light: #f9fafb;
   --color-gray-lighter: #f3f4f6;
   --color-gray: #6b7280;
   --color-gray-border: #d1d5db;
   --color-amber: #92400e;
+  --color-green: #16a34a;
+  --color-green-dark: #166534;
+  --color-green-bg: #f0fdf4;
 
   /* Typography */
   --font-display: "Playfair Display", serif;
   --font-body: "IBM Plex Mono", monospace;
 
   /* Spacing */
+  --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;

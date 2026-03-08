@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
 import { scenarios } from "../data/scenarios";
-import { submitPromptToApi } from "../utils/api-client";
-import { loadProgress, markScenarioComplete } from "../utils/progress";
+import { submitPromptToApi, gradePromptApi } from "../utils/api-client";
+import { loadProgress, markScenarioComplete, clearProgress } from "../utils/progress";
 import { ScenarioCard } from "../components/ScenarioCard";
 import { PromptEditor } from "../components/PromptEditor";
 import { ResponseDisplay } from "../components/ResponseDisplay";
-import { RubricDisplay } from "../components/RubricDisplay";
+import { FeedbackDisplay } from "../components/FeedbackDisplay";
 import { SolutionModal } from "../components/SolutionModal";
+import type { GradeFeedback } from "../types/scenario";
 import "./Arena.css";
 
 export function Arena() {
@@ -18,10 +19,16 @@ export function Arena() {
   const [error, setError] = useState("");
   const [showSolution, setShowSolution] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [feedback, setFeedback] = useState<GradeFeedback | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
     const { completedScenarios } = loadProgress();
     return new Set(scenarios.filter((s) => s.id in completedScenarios).map((s) => s.id));
   });
+
+  const isLastScenario =
+    scenarios.findIndex((s) => s.id === selectedScenario.id) === scenarios.length - 1;
 
   async function handleSubmitPrompt() {
     setIsLoading(true);
@@ -39,15 +46,34 @@ export function Arena() {
     }
   }
 
-  function handleGradeSubmit(score: number) {
-    markScenarioComplete(selectedScenario.id, score);
+  async function handleGetFeedback() {
+    setFeedbackLoading(true);
+    setFeedbackError(null);
+
+    try {
+      const result = await gradePromptApi(userPrompt, selectedScenario.task, claudeResponse);
+      setFeedback(result);
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : "Failed to get feedback");
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  function handleContinue() {
+    markScenarioComplete(selectedScenario.id, feedback?.isEffective ? 100 : 50);
     setCompletedIds((prev) => new Set([...prev, selectedScenario.id]));
 
-    const nextIdx =
-      scenarios.findIndex((s) => s.id === selectedScenario.id) + 1;
+    const nextIdx = scenarios.findIndex((s) => s.id === selectedScenario.id) + 1;
     if (nextIdx < scenarios.length) {
       selectScenario(scenarios[nextIdx].id);
     }
+  }
+
+  function handleStartOver() {
+    clearProgress();
+    setCompletedIds(new Set());
+    selectScenario(scenarios[0].id);
   }
 
   function selectScenario(id: string) {
@@ -65,6 +91,8 @@ export function Arena() {
     setHasSubmitted(false);
     setError("");
     setShowSolution(false);
+    setFeedback(null);
+    setFeedbackError(null);
   }
 
   const handleCloseSolution = useCallback(() => setShowSolution(false), []);
@@ -116,18 +144,44 @@ export function Arena() {
             <ResponseDisplay response={claudeResponse} tokensUsed={tokensUsed} />
           )}
 
-          {hasSubmitted && (
+          {hasSubmitted && !feedback && (
+            <div className="feedback-action">
+              {feedbackError && (
+                <div className="arena__error feedback-action__error">{feedbackError}</div>
+              )}
+              <button
+                className="btn-feedback"
+                onClick={handleGetFeedback}
+                disabled={feedbackLoading}
+              >
+                {feedbackLoading ? "Analyzing..." : feedbackError ? "Try Again" : "Get Feedback"}
+              </button>
+            </div>
+          )}
+
+          {feedback && (
             <>
-              <RubricDisplay
-                scenario={selectedScenario}
-                onGrade={handleGradeSubmit}
-              />
+              <FeedbackDisplay feedback={feedback} />
               <button
                 className="btn-solution"
                 onClick={() => setShowSolution(true)}
               >
                 See Expert Solution
               </button>
+              {isLastScenario ? (
+                <div className="arena__complete">
+                  <p className="arena__complete-message">
+                    You&apos;ve completed all scenarios. Great work.
+                  </p>
+                  <button className="btn-primary" onClick={handleStartOver}>
+                    Start Over
+                  </button>
+                </div>
+              ) : (
+                <button className="btn-primary" onClick={handleContinue}>
+                  Continue to Next Scenario
+                </button>
+              )}
             </>
           )}
         </main>
