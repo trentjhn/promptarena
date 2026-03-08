@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { checkRateLimit } from "../../api/_rateLimit";
+import { checkRateLimit, resetForTesting } from "../../api/_rateLimit";
 
 describe("checkRateLimit", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    resetForTesting();
   });
 
   afterEach(() => {
