@@ -5,7 +5,9 @@ import { PromptEditor } from "../components/PromptEditor";
 import { ResponseDisplay } from "../components/ResponseDisplay";
 import { RubricDisplay } from "../components/RubricDisplay";
 import { SolutionModal } from "../components/SolutionModal";
+import { FeedbackDisplay } from "../components/FeedbackDisplay";
 import type { Scenario } from "../types/scenario";
+import type { GradeFeedback } from "../types/scenario";
 
 const scenario: Scenario = {
   id: "test-scenario",
@@ -159,5 +161,45 @@ describe("SolutionModal", () => {
     render(<SolutionModal scenario={scenario} onClose={onClose} />);
     fireEvent.click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+const mockFeedback: GradeFeedback = {
+  objectiveMet: true,
+  objectiveFeedback: "The response covered all required points.",
+  strengths: ["Clear persona assigned", "Output format specified"],
+  gaps: ["No examples provided"],
+  rewrittenPrompt: "You are a senior analyst...",
+  isEffective: false,
+};
+
+describe("FeedbackDisplay", () => {
+  it("renders objective feedback and badge", () => {
+    render(<FeedbackDisplay feedback={mockFeedback} />);
+    expect(screen.getByText("Objective Met")).toBeInTheDocument();
+    expect(screen.getByText("The response covered all required points.")).toBeInTheDocument();
+  });
+
+  it("renders strengths list", () => {
+    render(<FeedbackDisplay feedback={mockFeedback} />);
+    expect(screen.getByText("Clear persona assigned")).toBeInTheDocument();
+  });
+
+  it("renders rewritten prompt when not effective", () => {
+    render(<FeedbackDisplay feedback={mockFeedback} />);
+    expect(screen.getByText("You are a senior analyst...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
+  });
+
+  it("shows effective message and hides rewrite when isEffective is true", () => {
+    render(
+      <FeedbackDisplay
+        feedback={{ ...mockFeedback, isEffective: true, gaps: [], rewrittenPrompt: "" }}
+      />
+    );
+    expect(
+      screen.getByText(/demonstrates effective technique/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /copy/i })).not.toBeInTheDocument();
   });
 });
