@@ -152,9 +152,11 @@ export function Arena() {
               >
                 See Expert Solution
               </button>
-              <button className="btn-primary" onClick={handleContinue}>
-                Continue to Next Scenario
-              </button>
+              {scenarios.findIndex((s) => s.id === selectedScenario.id) < scenarios.length - 1 && (
+                <button className="btn-primary" onClick={handleContinue}>
+                  Continue to Next Scenario
+                </button>
+              )}
             </>
           )}
         </main>
