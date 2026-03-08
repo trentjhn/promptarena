@@ -21,6 +21,7 @@
   --font-body: "IBM Plex Mono", monospace;
 
   /* Spacing */
+  --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
