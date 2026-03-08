@@ -11,7 +11,7 @@ export interface Scenario {
   title: string;
   description: string;
   task: string;
-  rubric: RubricCriterion[];
+  rubric?: RubricCriterion[];
   expertPrompt: string;
   expectedOutput?: string;
   hints?: string[];
