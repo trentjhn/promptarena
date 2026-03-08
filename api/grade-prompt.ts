@@ -148,7 +148,12 @@ ${claudeResponse}`;
 
     let feedback: unknown;
     try {
-      feedback = JSON.parse(firstBlock.text);
+      const cleaned = firstBlock.text
+        .trim()
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```\s*$/i, "")
+        .trim();
+      feedback = JSON.parse(cleaned);
     } catch {
       console.error("Failed to parse grading JSON:", firstBlock.text);
       res.status(500).json({ error: "Could not parse grading response. Please try again." });
