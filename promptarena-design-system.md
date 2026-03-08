@@ -12,7 +12,9 @@
 - Accent Blue: `#2563EB` (electric, not soft)
 
 **Semantic:**
-- Success: `#16A34A` (dark green, minimal use)
+- Success (medium): `#16A34A` — list markers, completed indicators
+- Success (dark): `#166534` — text on light green backgrounds (badge labels, effective message)
+- Success (bg): `#F0FDF4` — light green tint for "Objective Met" panel background
 - Error: `#DC2626` (dark red, minimal use)
 - Neutral: `#6B7280` (for secondary text only)
 
@@ -104,19 +106,24 @@ margin-bottom: 32px;
 
 Why: Minimal border. No shadow = flat, honest. Generous padding = breathing room.
 
-### Rubric Items
+### Feedback Display
 
+Replaces the old self-grading rubric. LLM-generated feedback rendered after the user clicks "Get Feedback".
+
+Four sections, separated by 1px gray borders:
+1. **Objective** — pass/fail badge + one-sentence explanation. Green bg (`#F0FDF4`) on pass, `#FFF5F5` on fail.
+2. **Strengths** — bulleted list, markers in `#16A34A`
+3. **Areas to Improve** — bulleted list, markers in `#DC2626`. Hidden when `isEffective: true`.
+4. **Improved Prompt** — `<pre>` block in gray bg with absolute-positioned "Copy" button. Hidden when `isEffective: true`.
+
+Badge styling:
 ```css
-border-left: 4px solid #2563EB;
-padding-left: 16px;
-margin-bottom: 16px;
+font-size: 11px; font-weight: 700; text-transform: uppercase;
+border: 1px solid currentColor; padding: 2px 8px;
+color: #166534 (pass) | #DC2626 (fail);
 ```
 
-Buttons inside rubric:
-- Pass button: `background: white; border: 2px solid #16A34A; color: #16A34A;`
-- Fail button: `background: white; border: 2px solid #DC2626; color: #DC2626;`
-
-Why: Left border accent (not full box) = minimal. Outline buttons for non-primary actions.
+Why: Four clearly separated sections let learners scan at a glance — did I hit the objective? what worked? what didn't? what should I have written?
 
 ### Solution Modal
 
@@ -175,7 +182,8 @@ Why: Stark black overlay. Modal enters from bottom with fade. Purposeful animati
 - Scenario description (top, 120px)
 - Prompt editor (scrollable textarea, flex-grow)
 - Response display (if submitted)
-- Rubric (if submitted)
+- "Get Feedback" button (if submitted, before grading)
+- Feedback display (if grading requested)
 
 Why: Asymmetric layout. Unequal columns = intentional visual hierarchy.
 
