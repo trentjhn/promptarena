@@ -16,3 +16,12 @@ export interface Scenario {
   expectedOutput?: string;
   hints?: string[];
 }
+
+export interface GradeFeedback {
+  objectiveMet: boolean;
+  objectiveFeedback: string;
+  strengths: string[];
+  gaps: string[];
+  rewrittenPrompt: string;
+  isEffective: boolean;
+}
