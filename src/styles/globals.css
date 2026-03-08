@@ -2,19 +2,19 @@
 
 :root {
   /* Colors */
-  --color-black: #000000;
-  --color-white: #ffffff;
-  --color-blue: #2563eb;
-  --color-blue-dark: #1d4ed8;
-  --color-red: #dc2626;
-  --color-gray-light: #f9fafb;
-  --color-gray-lighter: #f3f4f6;
-  --color-gray: #6b7280;
-  --color-gray-border: #d1d5db;
-  --color-amber: #92400e;
-  --color-green: #16a34a;
-  --color-green-dark: #166534;
-  --color-green-bg: #f0fdf4;
+  --color-black: #f8f8f2;
+  --color-white: #282a36;
+  --color-blue: #bd93f9;
+  --color-blue-dark: #a87ce8;
+  --color-red: #ff5555;
+  --color-gray-light: #21222c;
+  --color-gray-lighter: #1e1f29;
+  --color-gray: #6272a4;
+  --color-gray-border: #44475a;
+  --color-amber: #ffb86c;
+  --color-green: #50fa7b;
+  --color-green-dark: #50fa7b;
+  --color-green-bg: #1a3a28;
 
   /* Typography */
   --font-display: "Playfair Display", serif;
