@@ -21,6 +21,7 @@ export function Arena() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [feedback, setFeedback] = useState<GradeFeedback | null>(null);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
     const { completedScenarios } = loadProgress();
     return new Set(scenarios.filter((s) => s.id in completedScenarios).map((s) => s.id));
@@ -44,13 +45,13 @@ export function Arena() {
 
   async function handleGetFeedback() {
     setFeedbackLoading(true);
-    setError("");
+    setFeedbackError(null);
 
     try {
       const result = await gradePromptApi(userPrompt, selectedScenario.task, claudeResponse);
       setFeedback(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to get feedback");
+      setFeedbackError(err instanceof Error ? err.message : "Failed to get feedback");
     } finally {
       setFeedbackLoading(false);
     }
@@ -82,6 +83,7 @@ export function Arena() {
     setError("");
     setShowSolution(false);
     setFeedback(null);
+    setFeedbackError(null);
   }
 
   const handleCloseSolution = useCallback(() => setShowSolution(false), []);
@@ -134,13 +136,18 @@ export function Arena() {
           )}
 
           {hasSubmitted && !feedback && (
-            <button
-              className="btn-feedback"
-              onClick={handleGetFeedback}
-              disabled={feedbackLoading}
-            >
-              {feedbackLoading ? "Analyzing..." : "Get Feedback"}
-            </button>
+            <div className="feedback-action">
+              {feedbackError && (
+                <div className="arena__error feedback-action__error">{feedbackError}</div>
+              )}
+              <button
+                className="btn-feedback"
+                onClick={handleGetFeedback}
+                disabled={feedbackLoading}
+              >
+                {feedbackLoading ? "Analyzing..." : feedbackError ? "Try Again" : "Get Feedback"}
+              </button>
+            </div>
           )}
 
           {feedback && (
