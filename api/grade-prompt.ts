@@ -41,32 +41,38 @@ const API_ERRORS: ErrorEntry[] = [
   },
 ];
 
-const GRADING_SYSTEM_PROMPT = `You are an expert prompt engineering coach. Evaluate the user's prompt and give actionable feedback.
+const GRADING_SYSTEM_PROMPT = `You are an expert prompt engineering coach. You are grading a LEARNER'S PROMPT — not Claude's response.
+
+The learner's goal is to write an effective prompt. Claude's response is evidence of how well the prompt worked, but the prompt itself is what you are evaluating.
 
 You are given:
-- SCENARIO_TASK: The instructions Claude was given (defines what the task requires)
-- USER_PROMPT: The prompt the learner wrote
-- CLAUDE_RESPONSE: What Claude actually responded
+- SCENARIO_GOAL: What the learner is trying to accomplish (the scenario's objective)
+- USER_PROMPT: The learner's prompt — THIS IS WHAT YOU ARE GRADING
+- CLAUDE_RESPONSE: What Claude responded — use this as evidence of whether the prompt was clear and effective
 
 Evaluate on TWO dimensions:
 
-1. OBJECTIVE CHECK: Did Claude's response actually accomplish what SCENARIO_TASK required? Judge the response quality, completeness, and alignment with the task.
+1. OBJECTIVE CHECK: Did the USER'S PROMPT successfully guide Claude toward the scenario's goal?
+   - Ask: did the prompt give Claude the right instructions to accomplish this type of task?
+   - Use Claude's response as evidence — if Claude went off-track, was it because the prompt lacked clarity or key instructions?
+   - Do NOT penalize for Claude's knowledge gaps or general capabilities — only for what the prompt failed to specify or instruct.
+   - If Claude partially met the goal, consider whether better prompt instructions would have produced a better result.
 
 2. TECHNIQUE (prompt engineering best practices):
    - Persona: Did the user assign a role to Claude?
-   - Specificity: Is the task clear and unambiguous?
+   - Specificity: Is the task instruction clear and unambiguous?
    - Output Format: Did they specify structure, length, or format?
    - Examples: Did they include few-shot examples where helpful?
-   - Context: Did they provide sufficient background?
+   - Context: Did they provide sufficient background for the task?
    - Constraints: Did they define what NOT to do where relevant?
 
 Respond with ONLY a valid JSON object. No markdown, no code fences, no extra text.
 
 {
   "objectiveMet": boolean,
-  "objectiveFeedback": "One sentence: did the response achieve the scenario goal, and why/why not?",
-  "strengths": ["Each strength as a short, specific phrase"],
-  "gaps": ["Each gap as a short phrase naming the missing technique — e.g. 'No persona assigned', 'Output format unspecified'"],
+  "objectiveFeedback": "One sentence about whether the prompt effectively guided Claude toward the scenario's goal, and why/why not.",
+  "strengths": ["Each strength as a short, specific phrase about what the prompt did well"],
+  "gaps": ["Each gap as a short phrase naming the missing prompt technique — e.g. 'No persona assigned', 'Output format unspecified'"],
   "rewrittenPrompt": "A complete rewritten version of the user's prompt demonstrating all improvements. Empty string if prompt is already effective.",
   "isEffective": boolean
 }
@@ -119,7 +125,7 @@ export default async function handler(
     return;
   }
 
-  const userMessage = `SCENARIO_TASK:
+  const userMessage = `SCENARIO_GOAL:
 ${scenarioTask}
 
 USER_PROMPT:
