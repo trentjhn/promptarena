@@ -44,3 +44,11 @@ export function markScenarioComplete(scenarioId: string, score: number): void {
 export function isScenarioCompleted(scenarioId: string): boolean {
   return scenarioId in loadProgress().completedScenarios;
 }
+
+export function clearProgress(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.error("progress: failed to clear localStorage:", err);
+  }
+}

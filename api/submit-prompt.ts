@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { checkRateLimit } from "./_rateLimit";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -62,6 +63,19 @@ export default async function handler(
 
   if (!userPrompt?.trim() || !scenarioTask?.trim()) {
     res.status(400).json({ error: "Missing userPrompt or scenarioTask" });
+    return;
+  }
+
+  const rawIp = req.headers["x-forwarded-for"];
+  const ip = Array.isArray(rawIp) ? rawIp[0] : (rawIp ?? "unknown");
+
+  if (!checkRateLimit(ip)) {
+    res.status(429).json({ error: "Too many requests. Please wait a moment and try again." });
+    return;
+  }
+
+  if (userPrompt.trim().length > 4000) {
+    res.status(400).json({ error: "Prompt exceeds 4000 character limit." });
     return;
   }
 

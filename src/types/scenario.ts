@@ -11,8 +11,17 @@ export interface Scenario {
   title: string;
   description: string;
   task: string;
-  rubric: RubricCriterion[];
+  rubric?: RubricCriterion[];
   expertPrompt: string;
   expectedOutput?: string;
   hints?: string[];
+}
+
+export interface GradeFeedback {
+  objectiveMet: boolean;
+  objectiveFeedback: string;
+  strengths: string[];
+  gaps: string[];
+  rewrittenPrompt: string;
+  isEffective: boolean;
 }

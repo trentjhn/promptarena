@@ -1,3 +1,293 @@
+# Production Readiness Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Add rate limiting, input validation, a 15-scenario curriculum, UX polish, and a README to make PromptArena shareable.
+
+**Architecture:** Rate limiting uses an in-memory sliding window utility shared by both Vercel serverless handlers. Scenarios are static data in `src/data/scenarios.ts`. UX changes are confined to `src/pages/Arena.tsx` and `src/pages/Arena.css`. No new dependencies required.
+
+**Tech Stack:** React 18, TypeScript, Vite, Vitest + @testing-library/react, Vercel Serverless Functions, @anthropic-ai/sdk, custom CSS
+
+---
+
+## Background (read before starting)
+
+PromptArena is a prompt engineering learning app. The user writes prompts, Claude responds, and an LLM grader evaluates the prompt quality.
+
+Key files:
+- `api/submit-prompt.ts` — Vercel serverless handler: receives `userPrompt` + `scenarioTask`, calls Claude, returns response
+- `api/grade-prompt.ts` — Vercel serverless handler: receives `userPrompt` + `scenarioTask` + `claudeResponse`, calls Claude to grade the prompt
+- `src/data/scenarios.ts` — Static array of 3 scenarios (expanding to 15)
+- `src/types/scenario.ts` — TypeScript interfaces: `Scenario`, `RubricCriterion` (unused), `GradeFeedback`
+- `src/pages/Arena.tsx` — Main page component, all state management
+- `src/pages/Arena.css` — Arena layout styles (already has 768px breakpoint)
+- `src/components/PromptEditor.css` — Textarea has `min-height: 200px`, no mobile override yet
+- `src/utils/progress.ts` — localStorage utilities: `loadProgress`, `saveProgress`, `markScenarioComplete`, `isScenarioCompleted`. No `clearProgress` yet.
+- `src/__tests__/api-client.test.ts` — 9 tests for API client functions
+- `src/__tests__/components.test.tsx` — 13 smoke tests for components
+
+Run tests: `npm test`
+Check TypeScript: `npx tsc --noEmit`
+
+---
+
+### Task 1: Rate Limiting Utility
+
+**Files:**
+- Create: `api/_rateLimit.ts`
+- Create: `src/__tests__/rate-limit.test.ts`
+
+**Step 1: Write the failing tests**
+
+```typescript
+// src/__tests__/rate-limit.test.ts
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { checkRateLimit } from "../../api/_rateLimit";
+
+describe("checkRateLimit", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("allows requests under the limit", () => {
+    for (let i = 0; i < 5; i++) {
+      expect(checkRateLimit("1.2.3.4")).toBe(true);
+    }
+  });
+
+  it("rejects the 6th request from the same IP", () => {
+    for (let i = 0; i < 5; i++) checkRateLimit("10.0.0.1");
+    expect(checkRateLimit("10.0.0.1")).toBe(false);
+  });
+
+  it("allows requests again after the window expires", () => {
+    for (let i = 0; i < 5; i++) checkRateLimit("5.5.5.5");
+    vi.advanceTimersByTime(61_000);
+    expect(checkRateLimit("5.5.5.5")).toBe(true);
+  });
+
+  it("does not share limits between different IPs", () => {
+    for (let i = 0; i < 5; i++) checkRateLimit("1.1.1.1");
+    expect(checkRateLimit("2.2.2.2")).toBe(true);
+  });
+});
+```
+
+**Step 2: Run to verify they fail**
+
+```bash
+npm test src/__tests__/rate-limit.test.ts
+```
+
+Expected: FAIL — `checkRateLimit` not found.
+
+**Step 3: Implement `api/_rateLimit.ts`**
+
+```typescript
+// api/_rateLimit.ts
+const windows = new Map<string, number[]>();
+
+export function checkRateLimit(
+  ip: string,
+  limit = 5,
+  windowMs = 60_000
+): boolean {
+  const now = Date.now();
+  const timestamps = (windows.get(ip) ?? []).filter((t) => now - t < windowMs);
+  if (timestamps.length >= limit) return false;
+  timestamps.push(now);
+  windows.set(ip, timestamps);
+  return true;
+}
+```
+
+**Step 4: Run tests to verify they pass**
+
+```bash
+npm test src/__tests__/rate-limit.test.ts
+```
+
+Expected: 4/4 PASS.
+
+**Step 5: Run all tests**
+
+```bash
+npm test
+```
+
+Expected: all pass (29 existing + 4 new = 33 total).
+
+**Step 6: Commit**
+
+```bash
+git add api/_rateLimit.ts src/__tests__/rate-limit.test.ts
+git commit -m "feat: add in-memory sliding window rate limiter"
+```
+
+---
+
+### Task 2: Apply Rate Limiting + Input Cap to submit-prompt.ts
+
+**Files:**
+- Modify: `api/submit-prompt.ts`
+
+No new test file needed — the rate limiter is tested in Task 1; the handler validation is a straight guard clause.
+
+**Step 1: Read `api/submit-prompt.ts`**
+
+Read the file to understand current structure before editing.
+
+**Step 2: Add the import at the top of the file**
+
+After the existing imports, add:
+```typescript
+import { checkRateLimit } from "./_rateLimit";
+```
+
+**Step 3: Add IP extraction + rate limit check + input cap**
+
+Add this block immediately after the existing field validation block (the one that checks `!userPrompt?.trim() || !scenarioTask?.trim()`):
+
+```typescript
+  const rawIp = req.headers["x-forwarded-for"];
+  const ip = Array.isArray(rawIp) ? rawIp[0] : (rawIp ?? "unknown");
+
+  if (!checkRateLimit(ip)) {
+    res.status(429).json({ error: "Too many requests. Please wait a moment and try again." });
+    return;
+  }
+
+  if (userPrompt.trim().length > 4000) {
+    res.status(400).json({ error: "Prompt exceeds 4000 character limit." });
+    return;
+  }
+```
+
+**Step 4: Check TypeScript**
+
+```bash
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+**Step 5: Run all tests**
+
+```bash
+npm test
+```
+
+Expected: all pass.
+
+**Step 6: Commit**
+
+```bash
+git add api/submit-prompt.ts
+git commit -m "feat: add rate limiting and prompt length cap to submit-prompt"
+```
+
+---
+
+### Task 3: Apply Rate Limiting + Input Caps to grade-prompt.ts
+
+**Files:**
+- Modify: `api/grade-prompt.ts`
+
+Same pattern as Task 2. grade-prompt has an extra field (`claudeResponse`) so it gets an extra cap.
+
+**Step 1: Read `api/grade-prompt.ts`**
+
+Read the file.
+
+**Step 2: Add the import**
+
+After existing imports:
+```typescript
+import { checkRateLimit } from "./_rateLimit";
+```
+
+**Step 3: Add IP extraction + rate limit + input caps**
+
+Immediately after the existing field validation block (the one checking `!userPrompt?.trim() || !scenarioTask?.trim() || !claudeResponse?.trim()`), add:
+
+```typescript
+  const rawIp = req.headers["x-forwarded-for"];
+  const ip = Array.isArray(rawIp) ? rawIp[0] : (rawIp ?? "unknown");
+
+  if (!checkRateLimit(ip)) {
+    res.status(429).json({ error: "Too many requests. Please wait a moment and try again." });
+    return;
+  }
+
+  if (userPrompt.trim().length > 4000) {
+    res.status(400).json({ error: "Prompt exceeds 4000 character limit." });
+    return;
+  }
+
+  if (claudeResponse.trim().length > 8000) {
+    res.status(400).json({ error: "Response exceeds 8000 character limit." });
+    return;
+  }
+```
+
+**Step 4: Check TypeScript + run all tests**
+
+```bash
+npx tsc --noEmit && npm test
+```
+
+Expected: no errors, all pass.
+
+**Step 5: Commit**
+
+```bash
+git add api/grade-prompt.ts
+git commit -m "feat: add rate limiting and input caps to grade-prompt"
+```
+
+---
+
+### Task 4: Expand Scenarios from 3 to 15
+
+**Files:**
+- Modify: `src/types/scenario.ts`
+- Modify: `src/data/scenarios.ts`
+
+**Context:** `rubric` is currently required on `Scenario` but `RubricDisplay` was deleted — nothing renders it. Making it optional lets new scenarios omit the unused field cleanly. The existing 3 scenarios keep their `rubric` arrays unchanged.
+
+The existing scenarios must be renumbered to fit the new curriculum:
+- `extract-points`: stays at `number: 1`
+- `analyze-competitor`: changes from `number: 2` → `number: 6`
+- `prd-generation`: changes from `number: 3` → `number: 11`
+
+**Step 1: Make `rubric` optional in `src/types/scenario.ts`**
+
+Change:
+```typescript
+  rubric: RubricCriterion[];
+```
+To:
+```typescript
+  rubric?: RubricCriterion[];
+```
+
+**Step 2: Check TypeScript**
+
+```bash
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+**Step 3: Replace `src/data/scenarios.ts` with the complete 15-scenario array**
+
+Write the complete file below — do not omit any field, do not abbreviate. Preserve existing `rubric` arrays on the 3 original scenarios.
+
+```typescript
 import type { Scenario } from "../types/scenario";
 
 export const scenarios: Scenario[] = [
@@ -454,3 +744,409 @@ Goal: Launch a new SaaS product from idea to first 10 paying customers.`,
     ],
   },
 ];
+```
+
+**Step 4: Check TypeScript**
+
+```bash
+npx tsc --noEmit
+```
+
+Expected: no errors.
+
+**Step 5: Run all tests**
+
+```bash
+npm test
+```
+
+Expected: all pass.
+
+**Step 6: Commit**
+
+```bash
+git add src/types/scenario.ts src/data/scenarios.ts
+git commit -m "feat: expand curriculum from 3 to 15 scenarios"
+```
+
+---
+
+### Task 5: UX — Inline Feedback Error State with Retry
+
+**Files:**
+- Modify: `src/pages/Arena.tsx`
+- Modify: `src/pages/Arena.css`
+
+**Context:** Currently, if `gradePromptApi()` fails, the error is set in the global `error` state and shown above the response. A better UX is to show the feedback error inline — near the button that triggered it — with a "Try Again" label. This requires a dedicated `feedbackError` state.
+
+**Step 1: Read `src/pages/Arena.tsx`**
+
+Read the file before editing.
+
+**Step 2: Add `feedbackError` state**
+
+After the `feedbackLoading` state declaration, add:
+
+```typescript
+const [feedbackError, setFeedbackError] = useState<string | null>(null);
+```
+
+**Step 3: Update `handleGetFeedback`**
+
+Replace the existing function:
+
+```typescript
+async function handleGetFeedback() {
+  setFeedbackLoading(true);
+  setFeedbackError(null);
+
+  try {
+    const result = await gradePromptApi(userPrompt, selectedScenario.task, claudeResponse);
+    setFeedback(result);
+  } catch (err) {
+    setFeedbackError(err instanceof Error ? err.message : "Failed to get feedback");
+  } finally {
+    setFeedbackLoading(false);
+  }
+}
+```
+
+**Step 4: Reset `feedbackError` inside `selectScenario`**
+
+Add `setFeedbackError(null);` alongside the other resets in the `selectScenario` function.
+
+**Step 5: Update the feedback button JSX**
+
+Replace:
+```tsx
+{hasSubmitted && !feedback && (
+  <button
+    className="btn-feedback"
+    onClick={handleGetFeedback}
+    disabled={feedbackLoading}
+  >
+    {feedbackLoading ? "Analyzing..." : "Get Feedback"}
+  </button>
+)}
+```
+
+With:
+```tsx
+{hasSubmitted && !feedback && (
+  <div className="feedback-action">
+    {feedbackError && (
+      <div className="arena__error feedback-action__error">{feedbackError}</div>
+    )}
+    <button
+      className="btn-feedback"
+      onClick={handleGetFeedback}
+      disabled={feedbackLoading}
+    >
+      {feedbackLoading ? "Analyzing..." : feedbackError ? "Try Again" : "Get Feedback"}
+    </button>
+  </div>
+)}
+```
+
+**Step 6: Add CSS for `feedback-action`**
+
+In `src/pages/Arena.css`, find the `.btn-feedback` rule. It has `margin-top: var(--space-6)`. Move that margin to the wrapper and remove it from the button.
+
+Change `.btn-feedback`:
+```css
+.btn-feedback {
+  display: block;
+  /* remove margin-top from here — it moves to .feedback-action */
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--color-blue);
+  color: var(--color-white);
+  border: 2px solid var(--color-blue);
+  padding: var(--space-3) var(--space-6);
+  cursor: pointer;
+}
+```
+
+Add after the `.btn-feedback` block:
+```css
+.feedback-action {
+  margin-top: var(--space-6);
+}
+
+.feedback-action__error {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+}
+```
+
+**Step 7: Check TypeScript + run all tests**
+
+```bash
+npx tsc --noEmit && npm test
+```
+
+Expected: no errors, all pass.
+
+**Step 8: Commit**
+
+```bash
+git add src/pages/Arena.tsx src/pages/Arena.css
+git commit -m "feat: inline feedback error state with try again button"
+```
+
+---
+
+### Task 6: UX — Last Scenario Completion Banner
+
+**Files:**
+- Modify: `src/utils/progress.ts` (add `clearProgress`)
+- Modify: `src/pages/Arena.tsx`
+- Modify: `src/pages/Arena.css`
+
+**Step 1: Add `clearProgress` to `src/utils/progress.ts`**
+
+Read the file first. `STORAGE_KEY` is private (not exported) — that's correct. Add this function at the end of the file:
+
+```typescript
+export function clearProgress(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.error("progress: failed to clear localStorage:", err);
+  }
+}
+```
+
+**Step 2: Add `clearProgress` to the import in `Arena.tsx`**
+
+Change:
+```typescript
+import { loadProgress, markScenarioComplete } from "../utils/progress";
+```
+To:
+```typescript
+import { loadProgress, markScenarioComplete, clearProgress } from "../utils/progress";
+```
+
+**Step 3: Compute `isLastScenario` as a derived value in Arena.tsx**
+
+Add this after the state declarations, before the handlers:
+
+```typescript
+const isLastScenario =
+  scenarios.findIndex((s) => s.id === selectedScenario.id) === scenarios.length - 1;
+```
+
+**Step 4: Add `handleStartOver` function**
+
+After `handleContinue`, add:
+
+```typescript
+function handleStartOver() {
+  clearProgress();
+  setCompletedIds(new Set());
+  selectScenario(scenarios[0].id);
+}
+```
+
+**Step 5: Update the feedback JSX to show completion banner on last scenario**
+
+Replace this block:
+```tsx
+{scenarios.findIndex((s) => s.id === selectedScenario.id) < scenarios.length - 1 && (
+  <button className="btn-primary" onClick={handleContinue}>
+    Continue to Next Scenario
+  </button>
+)}
+```
+
+With:
+```tsx
+{isLastScenario ? (
+  <div className="arena__complete">
+    <p className="arena__complete-message">
+      You&apos;ve completed all scenarios. Great work.
+    </p>
+    <button className="btn-primary" onClick={handleStartOver}>
+      Start Over
+    </button>
+  </div>
+) : (
+  <button className="btn-primary" onClick={handleContinue}>
+    Continue to Next Scenario
+  </button>
+)}
+```
+
+**Step 6: Add CSS for `arena__complete`**
+
+Append to `src/pages/Arena.css`:
+
+```css
+.arena__complete {
+  border: 2px solid var(--color-black);
+  padding: var(--space-8);
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+.arena__complete-message {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--space-6);
+}
+```
+
+**Step 7: Check TypeScript + run all tests**
+
+```bash
+npx tsc --noEmit && npm test
+```
+
+Expected: no errors, all pass.
+
+**Step 8: Commit**
+
+```bash
+git add src/utils/progress.ts src/pages/Arena.tsx src/pages/Arena.css
+git commit -m "feat: last scenario completion banner with start over"
+```
+
+---
+
+### Task 7: Mobile — Reduce Textarea Min-Height
+
+**Files:**
+- Modify: `src/components/PromptEditor.css`
+
+**Context:** `Arena.css` already has a 768px breakpoint that switches to single-column layout and horizontal sidebar scrolling. The textarea `.prompt-editor__textarea` has `min-height: 200px` but no mobile override — it should shrink to 120px on small screens.
+
+**Step 1: Read `src/components/PromptEditor.css`**
+
+Confirm the textarea has `min-height: 200px` and no mobile media query.
+
+**Step 2: Add the mobile override**
+
+Append to `src/components/PromptEditor.css`:
+
+```css
+@media (max-width: 768px) {
+  .prompt-editor__textarea {
+    min-height: 120px;
+  }
+}
+```
+
+**Step 3: Run all tests**
+
+```bash
+npm test
+```
+
+Expected: all pass (CSS changes don't break tests).
+
+**Step 4: Commit**
+
+```bash
+git add src/components/PromptEditor.css
+git commit -m "fix: reduce textarea min-height on mobile"
+```
+
+---
+
+### Task 8: README
+
+**Files:**
+- Create: `README.md`
+
+**Step 1: Write `README.md` at project root**
+
+```markdown
+# PromptArena
+
+A prompt engineering practice arena powered by Claude. Write prompts, get real AI responses, and receive expert feedback on your technique.
+
+## What It Is
+
+PromptArena gives you 15 structured scenarios — from extracting action items to task decomposition — and teaches prompt engineering by doing. Write a prompt, see Claude's response, get AI-powered feedback on what worked and what to improve, then compare against an expert solution.
+
+## Scenarios
+
+**Beginner**
+1. Extract Key Points from Meeting Transcript
+2. Rewrite Email for Tone
+3. Classify Customer Feedback
+4. Handle Ambiguity — Ask Before Acting
+5. Use XML Tags to Separate Content
+
+**Intermediate**
+6. Competitive Strategy Analysis
+7. Summarize Under a Hard Constraint
+8. Chain-of-Thought Reasoning
+9. Few-Shot Prompting
+10. Conditional Instructions
+
+**Advanced**
+11. Generate PRD from Product Requirements
+12. Code Review and Plain-Language Explanation
+13. Self-Verification
+14. Meta-Prompting — Improve a Weak Prompt
+15. Task Decomposition
+
+## Tech Stack
+
+- React 18 + TypeScript + Vite
+- Vercel Serverless Functions
+- Anthropic Claude (claude-haiku-4-5-20251001)
+- Custom CSS — no UI library
+
+## Local Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Add your Anthropic API key to `.env`:
+   ```
+   ANTHROPIC_API_KEY=your_key_here
+   ```
+
+3. Start the Vite dev server:
+   ```bash
+   npm run dev
+   ```
+
+4. In a separate terminal, start the Vercel dev server (required for API routes):
+   ```bash
+   npx vercel dev
+   ```
+
+   Use the Vercel dev URL (default `http://localhost:3000`) rather than the Vite port for full functionality including API routes.
+
+## Deploy
+
+Deploy to Vercel and set `ANTHROPIC_API_KEY` as an environment variable in your project settings.
+
+## License
+
+MIT
+```
+
+**Step 2: Run all tests**
+
+```bash
+npm test
+```
+
+Expected: all pass.
+
+**Step 3: Commit**
+
+```bash
+git add README.md
+git commit -m "docs: add README"
+```

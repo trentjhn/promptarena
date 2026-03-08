@@ -95,6 +95,39 @@
   font-size: 13px;
 }
 
+.btn-feedback {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--color-blue);
+  color: var(--color-white);
+  border: 2px solid var(--color-blue);
+  padding: var(--space-3) var(--space-6);
+  cursor: pointer;
+}
+
+.btn-feedback:hover:not(:disabled) {
+  background: var(--color-black);
+  border-color: var(--color-black);
+}
+
+.btn-feedback:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.feedback-action {
+  margin-top: var(--space-6);
+}
+
+.feedback-action__error {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+}
+
 /* See Expert Solution button */
 .btn-solution {
   display: block;
@@ -152,4 +185,17 @@
   .arena__content {
     padding: var(--space-4);
   }
+}
+
+.arena__complete {
+  border: 2px solid var(--color-black);
+  padding: var(--space-8);
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+.arena__complete-message {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--space-6);
 }
