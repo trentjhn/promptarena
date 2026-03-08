@@ -1,12 +1,13 @@
 import { useState, useCallback } from "react";
 import { scenarios } from "../data/scenarios";
-import { submitPromptToApi } from "../utils/api-client";
+import { submitPromptToApi, gradePromptApi } from "../utils/api-client";
 import { loadProgress, markScenarioComplete } from "../utils/progress";
 import { ScenarioCard } from "../components/ScenarioCard";
 import { PromptEditor } from "../components/PromptEditor";
 import { ResponseDisplay } from "../components/ResponseDisplay";
-import { RubricDisplay } from "../components/RubricDisplay";
+import { FeedbackDisplay } from "../components/FeedbackDisplay";
 import { SolutionModal } from "../components/SolutionModal";
+import type { GradeFeedback } from "../types/scenario";
 import "./Arena.css";
 
 export function Arena() {
@@ -18,6 +19,8 @@ export function Arena() {
   const [error, setError] = useState("");
   const [showSolution, setShowSolution] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [feedback, setFeedback] = useState<GradeFeedback | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
     const { completedScenarios } = loadProgress();
     return new Set(scenarios.filter((s) => s.id in completedScenarios).map((s) => s.id));
@@ -39,12 +42,25 @@ export function Arena() {
     }
   }
 
-  function handleGradeSubmit(score: number) {
-    markScenarioComplete(selectedScenario.id, score);
+  async function handleGetFeedback() {
+    setFeedbackLoading(true);
+    setError("");
+
+    try {
+      const result = await gradePromptApi(userPrompt, selectedScenario.task, claudeResponse);
+      setFeedback(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to get feedback");
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }
+
+  function handleContinue() {
+    markScenarioComplete(selectedScenario.id, feedback?.isEffective ? 100 : 50);
     setCompletedIds((prev) => new Set([...prev, selectedScenario.id]));
 
-    const nextIdx =
-      scenarios.findIndex((s) => s.id === selectedScenario.id) + 1;
+    const nextIdx = scenarios.findIndex((s) => s.id === selectedScenario.id) + 1;
     if (nextIdx < scenarios.length) {
       selectScenario(scenarios[nextIdx].id);
     }
@@ -65,6 +81,7 @@ export function Arena() {
     setHasSubmitted(false);
     setError("");
     setShowSolution(false);
+    setFeedback(null);
   }
 
   const handleCloseSolution = useCallback(() => setShowSolution(false), []);
@@ -116,17 +133,27 @@ export function Arena() {
             <ResponseDisplay response={claudeResponse} tokensUsed={tokensUsed} />
           )}
 
-          {hasSubmitted && (
+          {hasSubmitted && !feedback && (
+            <button
+              className="btn-feedback"
+              onClick={handleGetFeedback}
+              disabled={feedbackLoading}
+            >
+              {feedbackLoading ? "Analyzing..." : "Get Feedback"}
+            </button>
+          )}
+
+          {feedback && (
             <>
-              <RubricDisplay
-                scenario={selectedScenario}
-                onGrade={handleGradeSubmit}
-              />
+              <FeedbackDisplay feedback={feedback} />
               <button
                 className="btn-solution"
                 onClick={() => setShowSolution(true)}
               >
                 See Expert Solution
+              </button>
+              <button className="btn-primary" onClick={handleContinue}>
+                Continue to Next Scenario
               </button>
             </>
           )}
