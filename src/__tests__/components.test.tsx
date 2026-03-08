@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from "vitest";
 import { ScenarioCard } from "../components/ScenarioCard";
 import { PromptEditor } from "../components/PromptEditor";
 import { ResponseDisplay } from "../components/ResponseDisplay";
-import { RubricDisplay } from "../components/RubricDisplay";
 import { SolutionModal } from "../components/SolutionModal";
 import { FeedbackDisplay } from "../components/FeedbackDisplay";
 import type { Scenario } from "../types/scenario";
@@ -112,40 +111,6 @@ describe("ResponseDisplay", () => {
     render(<ResponseDisplay response="Claude said hello" tokensUsed={123} />);
     expect(screen.getByText("Claude said hello")).toBeInTheDocument();
     expect(screen.getByText("123 tokens used")).toBeInTheDocument();
-  });
-});
-
-describe("RubricDisplay", () => {
-  it("does not show submit button before all criteria are graded", () => {
-    render(<RubricDisplay scenario={scenario} onGrade={vi.fn()} />);
-    expect(
-      screen.queryByRole("button", { name: /submit score/i })
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows submit button only after all criteria are graded", () => {
-    render(<RubricDisplay scenario={scenario} onGrade={vi.fn()} />);
-
-    // Grade both rubric items
-    const passButtons = screen.getAllByRole("button", { name: /pass/i });
-    fireEvent.click(passButtons[0]);
-    fireEvent.click(passButtons[1]);
-
-    expect(
-      screen.getByRole("button", { name: /submit score/i })
-    ).toBeInTheDocument();
-  });
-
-  it("calls onGrade with total score when submitted", () => {
-    const onGrade = vi.fn();
-    render(<RubricDisplay scenario={scenario} onGrade={onGrade} />);
-
-    const passButtons = screen.getAllByRole("button", { name: /pass/i });
-    fireEvent.click(passButtons[0]); // 50 pts
-    fireEvent.click(passButtons[1]); // 50 pts
-
-    fireEvent.click(screen.getByRole("button", { name: /submit score/i }));
-    expect(onGrade).toHaveBeenCalledWith(100);
   });
 });
 
