@@ -186,3 +186,16 @@
     padding: var(--space-4);
   }
 }
+
+.arena__complete {
+  border: 2px solid var(--color-black);
+  padding: var(--space-8);
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+.arena__complete-message {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--space-6);
+}

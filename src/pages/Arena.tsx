@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { scenarios } from "../data/scenarios";
 import { submitPromptToApi, gradePromptApi } from "../utils/api-client";
-import { loadProgress, markScenarioComplete } from "../utils/progress";
+import { loadProgress, markScenarioComplete, clearProgress } from "../utils/progress";
 import { ScenarioCard } from "../components/ScenarioCard";
 import { PromptEditor } from "../components/PromptEditor";
 import { ResponseDisplay } from "../components/ResponseDisplay";
@@ -26,6 +26,9 @@ export function Arena() {
     const { completedScenarios } = loadProgress();
     return new Set(scenarios.filter((s) => s.id in completedScenarios).map((s) => s.id));
   });
+
+  const isLastScenario =
+    scenarios.findIndex((s) => s.id === selectedScenario.id) === scenarios.length - 1;
 
   async function handleSubmitPrompt() {
     setIsLoading(true);
@@ -65,6 +68,12 @@ export function Arena() {
     if (nextIdx < scenarios.length) {
       selectScenario(scenarios[nextIdx].id);
     }
+  }
+
+  function handleStartOver() {
+    clearProgress();
+    setCompletedIds(new Set());
+    selectScenario(scenarios[0].id);
   }
 
   function selectScenario(id: string) {
@@ -159,7 +168,16 @@ export function Arena() {
               >
                 See Expert Solution
               </button>
-              {scenarios.findIndex((s) => s.id === selectedScenario.id) < scenarios.length - 1 && (
+              {isLastScenario ? (
+                <div className="arena__complete">
+                  <p className="arena__complete-message">
+                    You&apos;ve completed all scenarios. Great work.
+                  </p>
+                  <button className="btn-primary" onClick={handleStartOver}>
+                    Start Over
+                  </button>
+                </div>
+              ) : (
                 <button className="btn-primary" onClick={handleContinue}>
                   Continue to Next Scenario
                 </button>
